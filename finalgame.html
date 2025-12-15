@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kick Return Touchdown Game</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0b6623;
+      font-family: Arial, Helvetica, sans-serif;
+      color: white;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 15px 0 5px;
+    }
+
+    p {
+      margin: 5px 0 10px;
+    }
+
+    canvas {
+      background: #1e7f3a;
+      border: 4px solid white;
+      display: block;
+      margin: 0 auto 15px;
+    }
+
+    .instructions {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Kick Return Challenge 🏈</h1>
+  <p>Return the kickoff for a touchdown</p>
+  <div class="instructions">Use ← → ↑ ↓ or WASD to move</div>
+
+  <canvas id="game" width="600" height="800"></canvas>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const player = {
+      x: canvas.width / 2 - 10,
+      y: canvas.height - 60,
+      w: 20,
+      h: 20,
+      speed: 4
+    };
+
+    const defenders = [];
+    const blockers = [];
+    const defenderCount = 10;
+    const blockerCount = 4;
+
+    let keys = {};
+    let gameOver = false;
+    let win = false;
+
+    function createDefenders() {
+      defenders.length = 0;
+      blockers.length = 0;
+
+      for (let i = 0; i < defenderCount; i++) {
+        defenders.push({
+          x: Math.random() * (canvas.width - 20),
+          y: Math.random() * 300 + 80,
+          w: 20,
+          h: 20,
+          speed: 2.8 + Math.random() * 1.8
+        });
+      }
+
+      for (let i = 0; i < blockerCount; i++) {
+        blockers.push({
+          x: canvas.width / 2 + (i * 40) - 60,
+          y: canvas.height - 120,
+          w: 22,
+          h: 22,
+          speed: 2
+        });
+      }
+    }
+
+    createDefenders();
+
+    document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+    document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+    function movePlayer() {
+      if ((keys['arrowleft'] || keys['a']) && player.x > 0) player.x -= player.speed;
+      if ((keys['arrowright'] || keys['d']) && player.x + player.w < canvas.width) player.x += player.speed;
+      if ((keys['arrowup'] || keys['w']) && player.y > 0) player.y -= player.speed;
+      if ((keys['arrowdown'] || keys['s']) && player.y + player.h < canvas.height) player.y += player.speed;
+    }
+
+    function moveDefenders() {
+      // DEFENDERS: aggressively pursue the returner
+      defenders.forEach(d => {
+        const dx = player.x - d.x;
+        const dy = player.y - d.y;
+        const dist = Math.hypot(dx, dy) || 1;
+
+        d.x += (dx / dist) * d.speed;
+        d.y += (dy / dist) * d.speed;
+      });
+
+      // BLOCKERS: move upfield and engage nearest defender
+      blockers.forEach(b => {
+        // Move upfield to lead the return
+        b.y -= b.speed * 0.9;
+
+        // Target nearest defender ahead
+        const target = defenders
+          .filter(d => d.y < b.y + 60)
+          .reduce((closest, d) => {
+            const dist = Math.hypot(d.x - b.x, d.y - b.y);
+            return dist < closest.dist ? { d, dist } : closest;
+          }, { d: null, dist: Infinity }).d;
+
+        if (target) {
+          // Step into defender's lane
+          const dx = target.x - b.x;
+          const dy = target.y - b.y;
+          const dist = Math.hypot(dx, dy) || 1;
+
+          b.x += (dx / dist) * b.speed;
+          b.y += (dy / dist) * b.speed * 0.4;
+
+          // Strong block impact
+          if (checkCollision(b, target)) {
+            target.x += dx * 0.6;
+            target.y -= 25;
+          }
+        }
+      });
+    }
+
+    function checkCollision(a, b) {
+      return a.x < b.x + b.w &&
+             a.x + a.w > b.x &&
+             a.y < b.y + b.h &&
+             a.y + a.h > b.y;
+    }
+
+    function drawField() {
+      ctx.fillStyle = '#1e7f3a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = 'white';
+      for (let i = 0; i < canvas.height; i += 80) {
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(canvas.width, i);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#0b6623';
+      ctx.fillRect(0, 0, canvas.width, 60);
+
+      ctx.fillStyle = 'white';
+      ctx.font = '18px Arial';
+      ctx.fillText('END ZONE', canvas.width / 2 - 45, 38);
+    }
+
+    function drawPlayer() {
+      ctx.fillStyle = 'gold';
+      ctx.fillRect(player.x, player.y, player.w, player.h);
+    }
+
+    function drawDefenders() {
+      ctx.fillStyle = 'red';
+      defenders.forEach(d => ctx.fillRect(d.x, d.y, d.w, d.h));
+
+      ctx.fillStyle = 'blue';
+      blockers.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+    }
+
+    function gameLoop() {
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'white';
+        ctx.font = '32px Arial';
+        ctx.fillText(win ? 'TOUCHDOWN!' : 'TACKLED!', canvas.width / 2 - 110, canvas.height / 2);
+        ctx.font = '18px Arial';
+        ctx.fillText('Refresh to play again', canvas.width / 2 - 85, canvas.height / 2 + 40);
+        return;
+      }
+
+      drawField();
+      movePlayer();
+      moveDefenders();
+      drawPlayer();
+      drawDefenders();
+
+      defenders.forEach(d => {
+        if (checkCollision(player, d)) gameOver = true;
+      });
+
+      if (player.y <= 40) {
+        gameOver = true;
+        win = true;
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+  </script>
+
+</body>
+</html>
